@@ -1,0 +1,407 @@
+{
+	"info": {
+		"name": "Order & Payment Management API",
+		"description": "Extendable Order and Payment Management API built with Laravel. Covers Authentication (JWT), Order Management, and Payment Management (Strategy Pattern gateways).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_postman_id": "a1e2a3b4-1111-4a1a-9c9a-order-payment-api"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{ "key": "token", "value": "{{access_token}}", "type": "string" }
+		]
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:8000/api/v1" },
+		{ "key": "access_token", "value": "" },
+		{ "key": "order_id", "value": "1" }
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register (Success)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"password_confirmation\": \"password123\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"status": "Created",
+							"code": 201,
+							"body": "{\n  \"message\": \"User registered successfully.\",\n  \"data\": {\n    \"user\": { \"id\": 1, \"name\": \"John Doe\", \"email\": \"john@example.com\", \"created_at\": \"2026-10-20T08:00:00+00:00\" },\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...\",\n    \"token_type\": \"bearer\",\n    \"expires_in\": 3600\n  }\n}"
+						},
+						{
+							"name": "422 Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": {\n    \"email\": [\"The email field must be a valid email address.\"],\n    \"password\": [\"The password field confirmation does not match.\"]\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Login (Success)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const json = pm.response.json();",
+									"    pm.collectionVariables.set('access_token', json.data.access_token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"user\": { \"id\": 1, \"name\": \"John Doe\", \"email\": \"john@example.com\" },\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...\",\n    \"token_type\": \"bearer\",\n    \"expires_in\": 3600\n  }\n}"
+						},
+						{
+							"name": "401 Invalid Credentials",
+							"status": "Unauthorized",
+							"code": 401,
+							"body": "{\n  \"message\": \"The provided credentials are incorrect.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Current User (Me)",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"id\": 1, \"name\": \"John Doe\", \"email\": \"john@example.com\", \"created_at\": \"2026-10-20T08:00:00+00:00\" }\n}"
+						},
+						{
+							"name": "401 Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"body": "{\n  \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/auth/refresh", "host": ["{{base_url}}"], "path": ["auth", "refresh"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...\", \"token_type\": \"bearer\" }\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/auth/logout", "host": ["{{base_url}}"], "path": ["auth", "logout"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"message\": \"Logged out successfully.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Create Order (Success)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const json = pm.response.json();",
+									"    pm.collectionVariables.set('order_id', json.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_name\": \"John Doe\",\n  \"customer_email\": \"john@example.com\",\n  \"items\": [\n    { \"product_name\": \"Widget\", \"quantity\": 2, \"price\": 10.50 },\n    { \"product_name\": \"Gadget\", \"quantity\": 1, \"price\": 25.00 }\n  ]\n}"
+						},
+						"url": { "raw": "{{base_url}}/orders", "host": ["{{base_url}}"], "path": ["orders"] }
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"status": "Created",
+							"code": 201,
+							"body": "{\n  \"message\": \"Order created successfully.\",\n  \"data\": {\n    \"id\": 1,\n    \"customer_name\": \"John Doe\",\n    \"customer_email\": \"john@example.com\",\n    \"status\": \"pending\",\n    \"total\": 46,\n    \"items\": [\n      { \"id\": 1, \"product_name\": \"Widget\", \"quantity\": 2, \"price\": 10.5, \"subtotal\": 21 },\n      { \"id\": 2, \"product_name\": \"Gadget\", \"quantity\": 1, \"price\": 25, \"subtotal\": 25 }\n    ],\n    \"payments\": [],\n    \"created_at\": \"2026-10-20T08:00:00+00:00\",\n    \"updated_at\": \"2026-10-20T08:00:00+00:00\"\n  }\n}"
+						},
+						{
+							"name": "422 Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": {\n    \"items\": [\"An order must contain at least one item.\"]\n  }\n}"
+						},
+						{
+							"name": "401 Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"body": "{\n  \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "List Orders",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/orders?per_page=15",
+							"host": ["{{base_url}}"],
+							"path": ["orders"],
+							"query": [{ "key": "per_page", "value": "15" }]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": {\n    \"data\": [ { \"id\": 1, \"customer_name\": \"John Doe\", \"status\": \"pending\", \"total\": 46 } ],\n    \"links\": { \"first\": \"...\", \"last\": \"...\", \"prev\": null, \"next\": null },\n    \"meta\": { \"current_page\": 1, \"per_page\": 15, \"total\": 1 }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "List Orders Filtered By Status",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/orders?status=confirmed",
+							"host": ["{{base_url}}"],
+							"path": ["orders"],
+							"query": [{ "key": "status", "value": "confirmed" }]
+						}
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"data\": [], \"links\": {}, \"meta\": { \"current_page\": 1, \"per_page\": 15, \"total\": 0 } }\n}"
+						},
+						{
+							"name": "422 Invalid Status Value",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": { \"status\": [\"The selected status is invalid.\"] }\n}"
+						}
+					]
+				},
+				{
+					"name": "Show Order",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"id\": 1, \"customer_name\": \"John Doe\", \"status\": \"pending\", \"total\": 46, \"items\": [], \"payments\": [] }\n}"
+						},
+						{
+							"name": "404 Not Found",
+							"status": "Not Found",
+							"code": 404,
+							"body": "{\n  \"message\": \"No query results for model [App\\\\Models\\\\Order] 999\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Order Details",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_name\": \"John Updated\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"message\": \"Order updated successfully.\",\n  \"data\": { \"id\": 1, \"customer_name\": \"John Updated\" }\n}"
+						}
+					]
+				},
+				{
+					"name": "Confirm Order (Status Update)",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"confirmed\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"message\": \"Order updated successfully.\",\n  \"data\": { \"id\": 1, \"status\": \"confirmed\" }\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete Order (No Payments - Success)",
+					"request": {
+						"method": "DELETE",
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"message\": \"Order deleted successfully.\"\n}"
+						},
+						{
+							"name": "409 Conflict - Has Payments",
+							"status": "Conflict",
+							"code": 409,
+							"body": "{\n  \"message\": \"This order cannot be deleted because it has associated payments.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"item": [
+				{
+					"name": "Process Payment - Credit Card (Success)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"method\": \"credit_card\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}/payments", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", "payments"] }
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"status": "Created",
+							"code": 201,
+							"body": "{\n  \"message\": \"Payment processed.\",\n  \"data\": {\n    \"id\": 1,\n    \"order_id\": 1,\n    \"method\": \"credit_card\",\n    \"status\": \"successful\",\n    \"amount\": 46,\n    \"transaction_reference\": \"cc_62193f6f-aab5-461f-b879-3430a0fb68de\",\n    \"created_at\": \"2026-10-20T08:00:00+00:00\",\n    \"updated_at\": \"2026-10-20T08:00:00+00:00\"\n  }\n}"
+						},
+						{
+							"name": "409 Order Not Confirmed",
+							"status": "Conflict",
+							"code": 409,
+							"body": "{\n  \"message\": \"Payments can only be processed for orders in the confirmed status.\"\n}"
+						},
+						{
+							"name": "422 Invalid Method",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"body": "{\n  \"message\": \"The given data was invalid.\",\n  \"errors\": { \"method\": [\"The selected method is invalid.\"] }\n}"
+						}
+					]
+				},
+				{
+					"name": "Process Payment - PayPal (Success)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"method\": \"paypal\"\n}"
+						},
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}/payments", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", "payments"] }
+					},
+					"response": [
+						{
+							"name": "201 Created",
+							"status": "Created",
+							"code": 201,
+							"body": "{\n  \"message\": \"Payment processed.\",\n  \"data\": { \"id\": 2, \"order_id\": 1, \"method\": \"paypal\", \"status\": \"successful\", \"amount\": 46 }\n}"
+						}
+					]
+				},
+				{
+					"name": "List Payments For Order",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/orders/{{order_id}}/payments", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", "payments"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"data\": [ { \"id\": 1, \"order_id\": 1, \"method\": \"credit_card\", \"status\": \"successful\", \"amount\": 46 } ], \"links\": {}, \"meta\": {} }\n}"
+						}
+					]
+				},
+				{
+					"name": "List All Payments",
+					"request": {
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/payments", "host": ["{{base_url}}"], "path": ["payments"] }
+					},
+					"response": [
+						{
+							"name": "200 OK",
+							"status": "OK",
+							"code": 200,
+							"body": "{\n  \"data\": { \"data\": [ { \"id\": 1, \"order_id\": 1, \"method\": \"credit_card\", \"status\": \"successful\", \"amount\": 46 } ], \"links\": {}, \"meta\": {} }\n}"
+						}
+					]
+				}
+			]
+		}
+	]
+}
